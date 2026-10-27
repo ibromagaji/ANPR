@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ANPR Dashboard</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 2rem auto; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { padding: .5rem; border-bottom: 1px solid #ddd; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Detected plates</h1>
+  <p id="status">connecting...</p>
+  <table>
+    <thead>
+      <tr><th>Plate Number</th><th>Confidence</th><th>Camera</th><th>Captured</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script>
+    const rows = document.getElementById("rows");
+    const status = document.getElementById("status");
+
+    // Builds one table row. atTop = true puts it above the others.
+    function addRow(d, atTop) {
+      const tr = document.createElement("tr");
+      for (const value of [d.plate_number, d.confidence, d.camera_id, d.captured_at]) {
+        const td = document.createElement("td");
+        td.textContent = value;
+        tr.appendChild(td);
+      }
+      if (atTop) rows.prepend(tr);
+      else rows.appendChild(tr);
+    }
+
+    // Job 1: load history once, when the page opens
+    fetch("/detections")
+      .then(r => r.json())
+      .then(list => list.forEach(d => addRow(d, false)));
+
+    // Job 2: listen for new plates
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+    ws.onopen = () => status.textContent = "live";
+    ws.onclose = () => status.textContent = "disconnected";
+
+    ws.onmessage = (event) => {
+        console.log("received:", event.data);
+        const d = JSON.parse(event.data);
+        addRow(d, true);
+    };
+  </script>
+</body>
+</html>
